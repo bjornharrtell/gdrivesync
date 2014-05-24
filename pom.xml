@@ -37,6 +37,11 @@
     <artifactId>google-oauth-client-jetty</artifactId>
     <version>1.18.0-rc</version>
 </dependency>
+<dependency>
+    <groupId>commons-codec</groupId>
+    <artifactId>commons-codec</artifactId>
+    <version>1.9</version>
+</dependency>
 	</dependencies>
 
 	<build>
