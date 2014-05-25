@@ -1,19 +1,20 @@
 package org.wololo.gdrivesync2
 
-import scala.collection.JavaConversions.asScalaBuffer
-import scala.collection.JavaConversions.seqAsJavaList
-import scala.collection.mutable.ListBuffer
-
-import Globals._
-import com.google.api.client.util.store.FileDataStoreFactory
 import java.io.InputStreamReader
-import com.google.api.client.googleapis.auth.oauth2.GoogleClientSecrets
-import com.google.api.services.drive.DriveScopes
+
+import scala.collection.JavaConversions.seqAsJavaList
+
 import com.google.api.client.extensions.java6.auth.oauth2.AuthorizationCodeInstalledApp
-import com.google.api.client.googleapis.auth.oauth2.GoogleAuthorizationCodeFlow
-import com.typesafe.scalalogging.slf4j.LazyLogging
 import com.google.api.client.extensions.jetty.auth.oauth2.LocalServerReceiver
+import com.google.api.client.googleapis.auth.oauth2.GoogleAuthorizationCodeFlow
+import com.google.api.client.googleapis.auth.oauth2.GoogleClientSecrets
+import com.google.api.client.util.store.FileDataStoreFactory
 import com.google.api.services.drive.DriveScopes
+import com.typesafe.scalalogging.slf4j.LazyLogging
+
+import Globals.DATA_STORE_DIR
+import Globals.JSON_FACTORY
+import Globals.httpTransport
 
 object GoogleOAuth2 extends LazyLogging {
 	def authorize = {

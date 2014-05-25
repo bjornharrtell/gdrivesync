@@ -1,14 +1,15 @@
 package org.wololo.gdrivesync2
 
-import com.google.api.services.drive.model.File
-import org.apache.commons.codec.digest.DigestUtils
 import java.io.FileInputStream
+
 import scala.collection.mutable.ListBuffer
-import com.google.api.services.drive.Drive
+
+import org.apache.commons.codec.digest.DigestUtils
+
+import com.google.api.services.drive.model.File
 import com.typesafe.scalalogging.slf4j.LazyLogging
 
-import Globals._
-import SyncFile._
+import Globals.SYNC_STORE_DIR
 
 object SyncFile {
   def allChildren(children: ListBuffer[SyncFile]) : ListBuffer[SyncFile] = {
@@ -32,8 +33,8 @@ class SyncFile(var path: String, val driveFile: File) extends LazyLogging {
   val children = ListBuffer[SyncFile]()
   
   def sync = {
-    logger.debug("All children: " + allChildren(children).size)
-    allChildren(children).filter(_.isRemoteFolder).foreach(_.createLocalFolder)
+    logger.debug("All children: " + SyncFile.allChildren(children).size)
+    SyncFile.allChildren(children).filter(_.isRemoteFolder).foreach(_.createLocalFolder)
   }
   
   def createLocalFolder = {

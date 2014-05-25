@@ -1,14 +1,15 @@
 package org.wololo.gdrivesync2
 
 import scala.collection.JavaConversions.asScalaBuffer
-import scala.collection.JavaConversions.seqAsJavaList
 import scala.collection.mutable.ListBuffer
-import com.typesafe.scalalogging.slf4j.LazyLogging
+
+import com.google.api.client.auth.oauth2.Credential
 import com.google.api.services.drive.Drive
 import com.google.api.services.drive.model.File
-import scala.collection.mutable.ListBuffer
-import Globals._
-import com.google.api.client.auth.oauth2.Credential
+import com.typesafe.scalalogging.slf4j.LazyLogging
+
+import Globals.JSON_FACTORY
+import Globals.httpTransport
 
 class DriveMetaFetcher(credential: Credential) extends LazyLogging {
   
