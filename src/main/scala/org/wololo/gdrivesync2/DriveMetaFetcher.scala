@@ -9,9 +9,10 @@ import com.google.api.services.drive.model.File
 import com.typesafe.scalalogging.slf4j.LazyLogging
 
 import Globals.JSON_FACTORY
+import Globals.SYNC_STORE_DIR
 import Globals.httpTransport
 
-class DriveMetaFetcher(credential: Credential) extends LazyLogging {
+class DriveMetaFetcher(implicit credential: Credential) extends LazyLogging {
   
   val builder = new Drive.Builder(httpTransport, JSON_FACTORY, credential)
   builder.setApplicationName("GDriveSync")
@@ -22,7 +23,7 @@ class DriveMetaFetcher(credential: Credential) extends LazyLogging {
     logger.debug("Found root: " + driveRootId)
     val driveRoot = new File
     driveRoot.setId(driveRootId)
-    var root = new SyncFile("", driveRoot)
+    var root = new SyncFile(new java.io.File(SYNC_STORE_DIR.getPath(), ""), driveRoot)
     fetchChildren(root)
   }
 
@@ -61,12 +62,13 @@ class DriveMetaFetcher(credential: Credential) extends LazyLogging {
     result --= noParents
 
     def findChildren(folder: SyncFile) {
-      logger.debug("Searching for children path: " + folder.path)
-      folder.children ++= result.filter(_.getParents().get(0).getId() == folder.driveFile.getId()).map(file => {
-        val isFolder = file.getMimeType == "application/vnd.google-apps.folder"
-        val path = folder.path + file.getTitle + (if (isFolder) "/" else "")
-        logger.debug("Found child with path: " + path)
-        val syncFile = new SyncFile(path, file)
+      //logger.debug("Searching for children path: " + folder.path)
+      val subresult = result.filter(_.getParents().get(0).getId() == folder.driveFile.getId())
+      folder.children ++= subresult.map(driveFile => {
+        val isFolder = driveFile.getMimeType == "application/vnd.google-apps.folder"
+        val localFile = new java.io.File(folder.path, driveFile.getTitle)
+        //logger.debug("Found child with path: " + localFile)
+        val syncFile = new SyncFile(localFile, driveFile)
         if (isFolder) findChildren(syncFile)
         syncFile
       })
