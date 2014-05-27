@@ -11,6 +11,8 @@ import org.mapdb.DBMaker
 
 object GDriveSync2 extends App with LazyLogging {
   
+  // TODO: handle args
+  
   implicit val credential = GoogleOAuth2.authorize
   
   implicit def drive = {
