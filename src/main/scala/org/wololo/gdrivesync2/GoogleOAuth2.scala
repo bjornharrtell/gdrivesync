@@ -17,23 +17,22 @@ import Globals.JSON_FACTORY
 import Globals.httpTransport
 
 object GoogleOAuth2 extends LazyLogging {
-	def authorize = {
-	  val dataStoreFactory = new FileDataStoreFactory(DATA_STORE_DIR);
+  def authorize = {
+    val dataStoreFactory = new FileDataStoreFactory(DATA_STORE_DIR);
 
-	  val clientSecretsStream = GDriveSync2.getClass.getResourceAsStream("/client_secrets.json")
-	  val clientSecrets = GoogleClientSecrets
-	  	.load(JSON_FACTORY, new InputStreamReader(clientSecretsStream))
-	  
-	  val flow = new GoogleAuthorizationCodeFlow
-	  	.Builder(httpTransport, JSON_FACTORY, clientSecrets, List(DriveScopes.DRIVE))
-	  	.setDataStoreFactory(dataStoreFactory)
-	  	.build
-	
-	  val credential = new AuthorizationCodeInstalledApp(flow, new LocalServerReceiver())
-	  	.authorize("user")
-	  	
-	  logger.debug("Authorized with Google Drive: " + credential.getAccessToken())
-	  
-	  credential
-	}
+    val clientSecretsStream = GDriveSync2.getClass.getResourceAsStream("/client_secrets.json")
+    val clientSecrets = GoogleClientSecrets
+      .load(JSON_FACTORY, new InputStreamReader(clientSecretsStream))
+
+    val flow = new GoogleAuthorizationCodeFlow.Builder(httpTransport, JSON_FACTORY, clientSecrets, List(DriveScopes.DRIVE))
+      .setDataStoreFactory(dataStoreFactory)
+      .build
+
+    val credential = new AuthorizationCodeInstalledApp(flow, new LocalServerReceiver())
+      .authorize("user")
+
+    logger.debug("Authorized with Google Drive: " + credential.getAccessToken())
+
+    credential
+  }
 }

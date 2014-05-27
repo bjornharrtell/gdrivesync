@@ -19,7 +19,7 @@ class DriveMetaFetcher(implicit drive: Drive) extends LazyLogging {
     logger.info("Found Google Drive root with id " + driveRootId)
     val driveRoot = new File
     driveRoot.setId(driveRootId)
-    var root = new SyncFile(new java.io.File(SYNC_STORE_DIR.getPath(), ""), driveRoot)
+    var root = new SyncFile(new java.io.File(SYNC_STORE_DIR.getPath, ""), driveRoot, drive)
     fetchChildren(root)
   }
 
@@ -30,12 +30,12 @@ class DriveMetaFetcher(implicit drive: Drive) extends LazyLogging {
     do {
       val files = request.execute
       val items = files.getItems
-      logger.info("Fetched " + items.length + " items from Google Drive API")
+      logger.info("Fetched " + items.length + " Google Drive items")
       result ++= items
       request.setPageToken(files.getNextPageToken)
     } while (request.getPageToken != null && request.getPageToken.length > 0)
 
-    logger.info("Fetched " + result.size + " from Google Drive API")
+    logger.info("Total Google Drive items fetched: " + result.size)
 
     var notOwned = result filter { _.getOwners.toList exists { !_.getIsAuthenticatedUser } }
     logger.info("Found " + notOwned.size + " items not owned by you")
@@ -64,7 +64,7 @@ class DriveMetaFetcher(implicit drive: Drive) extends LazyLogging {
         val isFolder = driveFile.getMimeType == "application/vnd.google-apps.folder"
         val localFile = new java.io.File(folder.path, driveFile.getTitle)
         //logger.debug("Found child with path: " + localFile)
-        val syncFile = new SyncFile(localFile, driveFile)
+        val syncFile = new SyncFile(localFile, driveFile, drive)
         if (isFolder) findChildren(syncFile)
         syncFile
       })

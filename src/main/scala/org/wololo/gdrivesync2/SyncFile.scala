@@ -1,11 +1,16 @@
 package org.wololo.gdrivesync2
 
 import java.io.FileInputStream
+
+import scala.annotation.migration
 import scala.collection.mutable.ListBuffer
+
 import org.apache.commons.codec.digest.DigestUtils
+
+import com.google.api.client.http.FileContent
+import com.google.api.services.drive.Drive
 import com.google.api.services.drive.model.File
 import com.typesafe.scalalogging.slf4j.LazyLogging
-import com.google.api.client.http.FileContent
 
 object SyncFile {
   def allChildren(children: ListBuffer[SyncFile]): ListBuffer[SyncFile] = {
@@ -17,12 +22,12 @@ object SyncFile {
   }
 }
 
-class SyncFile(val localFile: java.io.File, var driveFile: File) extends LazyLogging {
-  val path = localFile.getPath()
+class SyncFile(val localFile: java.io.File, var driveFile: File, implicit val drive: Drive) extends LazyLogging {
+  val path = localFile.getPath
   def localMD5 = DigestUtils.md5Hex(new FileInputStream(localFile))
-  def isIdentical = localMD5 == driveFile.getMd5Checksum()
+  def isIdentical = localMD5 == driveFile.getMd5Checksum
   def isRemoteFolder = driveFile.getMimeType == "application/vnd.google-apps.folder"
-  def existsRemotely = driveFile.getId() != null
+  def existsRemotely = driveFile.getId != null
 
   val wasSynced = false
 
@@ -34,31 +39,31 @@ class SyncFile(val localFile: java.io.File, var driveFile: File) extends LazyLog
 
   def sync = {
     logger.info("Begin sync of " + allChildren.size + " remote and/or local items")
-    
+
     logger.info("Creating local folders that only exists remotely")
     allChildren
       .filter(file => file.isRemoteFolder && file.existsRemotely)
       .filterNot(_.localFile.exists())
       .foreach(_.createLocalFolder)
-    
+
     logger.info("Creating remote folders that only exist locally")
     allChildren
       .filter(file => file.localFile.isDirectory && !file.existsRemotely)
       .foreach(_.createRemoteFolder)
-    
+
     logger.info("Upload files that only exist locally")
     allChildren
       .filter(file => file.localFile.exists && !file.localFile.isDirectory && !file.existsRemotely)
       .foreach(_.upload)
-      
+
     logger.info("Update files that are newer locally and not identical")
     allChildren
       .filter(file =>
         file.localFile.exists &&
-        !file.localFile.isDirectory &&
-        file.existsRemotely &&
-        !file.isIdentical &&
-        file.localFile.lastModified > file.driveFile.getModifiedDate.getValue)
+          !file.localFile.isDirectory &&
+          file.existsRemotely &&
+          !file.isIdentical &&
+          file.localFile.lastModified > file.driveFile.getModifiedDate.getValue)
       .foreach(_.update)
   }
 
@@ -66,21 +71,21 @@ class SyncFile(val localFile: java.io.File, var driveFile: File) extends LazyLog
     logger.info("Creating local folder at " + path)
     localFile.mkdir
   }
-  
+
   def createRemoteFolder = {
-	logger.info("Creating remote folder for local path " + path)
-	GDriveSync2.drive.files.insert(driveFile).execute
+    logger.info("Creating remote folder for local path " + path)
+    drive.files.insert(driveFile).execute
   }
-  
+
   def upload = {
     logger.info("Uploading file " + localFile.getPath)
     val mediaContent = new FileContent(driveFile.getMimeType, localFile)
-    GDriveSync2.drive.files.insert(driveFile, mediaContent).execute
+    drive.files.insert(driveFile, mediaContent).execute
   }
-  
+
   def update = {
     logger.info("Updating file " + localFile.getPath)
     val mediaContent = new FileContent(driveFile.getMimeType, localFile)
-    GDriveSync2.drive.files.update(driveFile.getId, driveFile, mediaContent).execute
+    drive.files.update(driveFile.getId, driveFile, mediaContent).execute
   }
 }

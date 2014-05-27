@@ -1,10 +1,13 @@
 package org.wololo.gdrivesync2
 
 import java.sql.DriverManager
-import com.typesafe.scalalogging.slf4j.LazyLogging
-import Globals.SYNC_STORE_DIR
+
 import com.google.api.services.drive.Drive
-import Globals._
+import com.typesafe.scalalogging.slf4j.LazyLogging
+
+import Globals.JSON_FACTORY
+import Globals.SYNC_STORE_DIR
+import Globals.httpTransport
 
 object GDriveSync2 extends App with LazyLogging {
 
@@ -19,7 +22,7 @@ object GDriveSync2 extends App with LazyLogging {
   if (SYNC_STORE_DIR.exists()) {
     val root = new DriveMetaFetcher().fetchRoot
 
-    LocalMetaFetcher.findLocalMeta(root)
+    new LocalMetaFetcher().findLocalMeta(root)
 
     root.sync
   } else {

@@ -7,8 +7,9 @@ import java.nio.file.Files
 import com.google.api.services.drive.model.ParentReference
 import scala.collection.JavaConverters._
 import com.google.api.client.util.DateTime
+import com.google.api.services.drive.Drive
 
-object LocalMetaFetcher extends LazyLogging {
+class LocalMetaFetcher(implicit val drive: Drive) extends LazyLogging {
   /*def detectMimeType(file: java.io.File) = {
     val tika = new TikaConfig()
     val metadata = new Metadata()
@@ -33,7 +34,7 @@ object LocalMetaFetcher extends LazyLogging {
           driveFile.setMimeType(Files.probeContentType(file.toPath()));
         }
         driveFile.setParents(List(new ParentReference().setId(folder.driveFile.getId())).asJava)
-        val syncFile = new SyncFile(file, driveFile)
+        val syncFile = new SyncFile(file, driveFile, drive)
         folder.children += syncFile
         syncFile
       }
