@@ -1,16 +1,16 @@
 package org.wololo.gdrivesync2
 
 import java.sql.DriverManager
-
 import com.google.api.services.drive.Drive
 import com.typesafe.scalalogging.slf4j.LazyLogging
-
 import Globals.JSON_FACTORY
 import Globals.SYNC_STORE_DIR
 import Globals.httpTransport
+import Globals.DATA_STORE_DIR 
+import org.mapdb.DBMaker
 
 object GDriveSync2 extends App with LazyLogging {
-
+  
   implicit val credential = GoogleOAuth2.authorize
   
   implicit def drive = {
@@ -18,6 +18,8 @@ object GDriveSync2 extends App with LazyLogging {
     builder.setApplicationName("GDriveSync")
     builder.build
   }
+  
+  implicit val localMetaStore = new LocalMetaStore()
   
   if (SYNC_STORE_DIR.exists()) {
     val root = new DriveMetaFetcher().fetchRoot
@@ -27,10 +29,7 @@ object GDriveSync2 extends App with LazyLogging {
     root.sync
   } else {
     logger.error("Destination sync directory does not exists, aborting and clearing metadata.")
+    localMetaStore.clear
   }
-
-  DriverManager.getConnection(
-    "jdbc:hsqldb:file:" + Globals.DATA_STORE_DIR.getPath() + "/metadb", "SA", "");
-
-  // TODO: implement local metastore, local filesystem meta recurse, sync
+  
 }
