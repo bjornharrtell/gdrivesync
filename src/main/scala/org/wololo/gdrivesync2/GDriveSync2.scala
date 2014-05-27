@@ -11,7 +11,7 @@ import org.mapdb.DBMaker
 
 object GDriveSync2 extends App with LazyLogging {
   
-  // TODO: handle args
+  // TODO: handle args perhaps with http://felix.apache.org/site/61-extending-the-console.html
   
   implicit val credential = GoogleOAuth2.authorize
   
