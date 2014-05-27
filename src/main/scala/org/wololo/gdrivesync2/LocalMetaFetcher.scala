@@ -4,6 +4,9 @@ import com.google.api.services.drive.model.File
 import com.typesafe.scalalogging.slf4j.LazyLogging
 import java.nio.file.Path
 import java.nio.file.Files
+import com.google.api.services.drive.model.ParentReference
+import scala.collection.JavaConverters._
+import com.google.api.client.util.DateTime
 
 object LocalMetaFetcher extends LazyLogging {
   /*def detectMimeType(file: java.io.File) = {
@@ -19,15 +22,17 @@ object LocalMetaFetcher extends LazyLogging {
     folder.childAtPath(file) match {
       case Some(syncFile) => syncFile
       case None => {
-        logger.debug("Creating new SyncFile for path " + file)
+        //logger.debug("Creating new SyncFile for path " + file)
         val driveFile = new File()
         driveFile.setTitle(file.getName())
         //driveFile.setDescription()
+        driveFile.setModifiedDate(new DateTime(file.lastModified))
         if (file.isDirectory()) {
           driveFile.setMimeType("application/vnd.google-apps.folder");
         } else {
           driveFile.setMimeType(Files.probeContentType(file.toPath()));
         }
+        driveFile.setParents(List(new ParentReference().setId(folder.driveFile.getId())).asJava)
         val syncFile = new SyncFile(file, driveFile)
         folder.children += syncFile
         syncFile

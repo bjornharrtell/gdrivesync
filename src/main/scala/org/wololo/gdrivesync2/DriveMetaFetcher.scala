@@ -12,15 +12,11 @@ import Globals.JSON_FACTORY
 import Globals.SYNC_STORE_DIR
 import Globals.httpTransport
 
-class DriveMetaFetcher(implicit credential: Credential) extends LazyLogging {
-  
-  val builder = new Drive.Builder(httpTransport, JSON_FACTORY, credential)
-  builder.setApplicationName("GDriveSync")
-  val drive = builder.build
+class DriveMetaFetcher(implicit drive: Drive) extends LazyLogging {
   
   def fetchRoot = {
     val driveRootId = drive.about.get.execute.getRootFolderId
-    logger.debug("Found root: " + driveRootId)
+    logger.info("Found Google Drive root with id " + driveRootId)
     val driveRoot = new File
     driveRoot.setId(driveRootId)
     var root = new SyncFile(new java.io.File(SYNC_STORE_DIR.getPath(), ""), driveRoot)
@@ -34,31 +30,31 @@ class DriveMetaFetcher(implicit credential: Credential) extends LazyLogging {
     do {
       val files = request.execute
       val items = files.getItems
-      logger.debug("Fetched items: " + items.length)
+      logger.info("Fetched " + items.length + " items from Google Drive API")
       result ++= items
       request.setPageToken(files.getNextPageToken)
     } while (request.getPageToken != null && request.getPageToken.length > 0)
 
-    logger.debug("Fetched " + result.size + " from Google Drive API")
+    logger.info("Fetched " + result.size + " from Google Drive API")
 
     var notOwned = result filter { _.getOwners.toList exists { !_.getIsAuthenticatedUser } }
-    logger.debug("Found " + notOwned.size + " items not owned by you")
-    logger.debug("Ignoring items not owned by you")
+    logger.info("Found " + notOwned.size + " items not owned by you")
+    logger.info("Ignoring items not owned by you")
     result --= notOwned
 
     var trashed = result filter { _.getExplicitlyTrashed() != null }
-    logger.debug("Found " + trashed.size + " trashed items")
-    logger.debug("Ignoring trashed items")
+    logger.info("Found " + trashed.size + " trashed items")
+    logger.info("Ignoring trashed items")
     result --= trashed
 
     var multipleParents = result filter { _.getParents.length > 1 }
-    logger.debug("Found " + multipleParents.size + " items with multiple parents")
-    logger.debug("Ignoring items with multiple parents")
+    logger.info("Found " + multipleParents.size + " items with multiple parents")
+    logger.info("Ignoring items with multiple parents")
     result --= multipleParents
 
     var noParents = result filter { _.getParents.length == 0 }
-    logger.debug(noParents.size + " items with no parents")
-    logger.debug("Ignoring items with no parents")
+    logger.info(noParents.size + " items with no parents")
+    logger.info("Ignoring items with no parents")
     result --= noParents
 
     def findChildren(folder: SyncFile) {
