@@ -21,7 +21,7 @@ object GDriveSync2 extends App with LazyLogging {
   
   implicit val localMetaStore = new LocalMetaStore()
   
-  if (SYNC_STORE_DIR.exists()) {
+  if (SYNC_STORE_DIR.exists) {
     val root = new DriveMetaFetcher().fetchRoot
 
     new LocalMetaFetcher().findLocalMeta(root)

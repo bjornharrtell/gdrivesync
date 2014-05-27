@@ -44,6 +44,8 @@ class SyncFile(val localFile: java.io.File, val driveFile: File, implicit val dr
   def sync(implicit localMetaStore: LocalMetaStore) = {
     logger.info("Begin sync of " + allChildren.size + " remote and/or local items")
 
+    // TODO: need to handle case when local and remote file exists but has not been synced
+    
     logger.info("Creating local folders that only exists remotely")
     allChildren
       .filter(file => file.isRemoteFolder && file.existsRemotely && !file.localFile.exists)
@@ -89,9 +91,7 @@ class SyncFile(val localFile: java.io.File, val driveFile: File, implicit val dr
     allChildren
       .filter(file =>
         file.localFile.exists && !file.existsRemotely && localMetaStore.contains(file.path))
-      .foreach(file => {
-        logger.debug("File " + file.path + " was previously synced but do no longer exist remotely")
-      })
+      .foreach(_.deleteLocal)
   }
 
   def createLocalFolder(implicit localMetaStore: LocalMetaStore) = {
@@ -129,7 +129,7 @@ class SyncFile(val localFile: java.io.File, val driveFile: File, implicit val dr
     drive.files.update(id, driveFile, mediaContent).execute
   }
 
-  def delete(implicit localMetaStore: LocalMetaStore) = {
+  def deleteRemote(implicit localMetaStore: LocalMetaStore) = {
     logger.info("Deleting remote file " + path)
     drive.files.delete(id).execute
     localMetaStore.remove(path)
