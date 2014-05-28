@@ -2,6 +2,7 @@ package org.wololo.gdrivesync2
 
 import org.mapdb.DBMaker
 import Globals.DATA_STORE_DIR
+import Globals.SYNC_STORE_DIR
 
 // TODO: use relative paths so that metastore can be used after moving destination
 
@@ -16,18 +17,20 @@ class LocalMetaStore {
     db.commit
     db.compact
   }
+  
+  def relativePath(path: String) = path.substring(SYNC_STORE_DIR.getPath().length)
 
   def add(path: String) = {
-    set.add(path)
+    set.add(relativePath(path))
     db.commit
   }
 
   def remove(path: String) = {
-    set.remove(path)
+    set.remove(relativePath(path))
     db.commit
   }
 
   def contains(path: String) = {
-    set.contains(path)
+    set.contains(relativePath(path))
   }
 }

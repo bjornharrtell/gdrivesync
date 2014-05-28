@@ -6,32 +6,43 @@ import com.typesafe.scalalogging.slf4j.LazyLogging
 import Globals.JSON_FACTORY
 import Globals.SYNC_STORE_DIR
 import Globals.httpTransport
-import Globals.DATA_STORE_DIR 
+import Globals.DATA_STORE_DIR
 import org.mapdb.DBMaker
-
+import org.clapper.argot._
 object GDriveSync2 extends App with LazyLogging {
-  
-  // TODO: handle args perhaps with http://felix.apache.org/site/61-extending-the-console.html
-  
-  implicit val credential = GoogleOAuth2.authorize
-  
-  implicit def drive = {
-    val builder = new Drive.Builder(httpTransport, JSON_FACTORY, credential)
-    builder.setApplicationName("GDriveSync")
-    builder.build
-  }
-  
+
   implicit val localMetaStore = new LocalMetaStore()
+
+  import ArgotConverters._
+  val parser = new ArgotParser("GDriveSync")
+  val dest = parser.option[String](List("d"), "PATH", "Directory to represent root of Google Drive when syncing (defaults to ~/gdrive)")
+  val clear = parser.flag[Boolean](List("c"), "Clear metadata store")
+  val help = parser.flag[Boolean](List("help"), "Show usage")
   
+  try {
+    parser.parse(args)
+    if (help.value.isDefined) parser.usage
+    if (clear.value.isDefined) {
+      logger.info("Clearing metadata")
+      localMetaStore.clear
+      System.exit(0)
+    }
+    if (dest.value.isDefined) Globals.SYNC_STORE_DIR = new java.io.File(dest.value.get)
+  } catch {
+    case e: ArgotUsageException => println(e.message)
+  }
+
+  implicit val drive = new Drive.Builder(httpTransport, JSON_FACTORY, GoogleOAuth2.authorize)
+    .setApplicationName("GDriveSync")
+    .build
+
   if (SYNC_STORE_DIR.exists) {
     val root = new DriveMetaFetcher().fetchRoot
-
     new LocalMetaFetcher().findLocalMeta(root)
-
     root.sync
   } else {
     logger.error("Destination sync directory does not exists, aborting and clearing metadata.")
     localMetaStore.clear
   }
-  
+
 }
