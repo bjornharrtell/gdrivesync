@@ -3,17 +3,16 @@ package org.wololo.gdrivesync2
 import java.io.BufferedInputStream
 import java.io.FileInputStream
 import java.io.FileOutputStream
-
 import scala.collection.mutable.ListBuffer
-
 import org.apache.commons.codec.digest.DigestUtils
 import org.apache.commons.io.IOUtils
-
 import com.google.api.client.http.GenericUrl
 import com.google.api.client.http.InputStreamContent
 import com.google.api.services.drive.Drive
 import com.google.api.services.drive.model.File
 import com.typesafe.scalalogging.slf4j.LazyLogging
+import com.google.api.services.drive.model.ParentReference
+import scala.collection.JavaConverters._
 
 object SyncFile {
   def allChildren(children: ListBuffer[SyncFile]): ListBuffer[SyncFile] = {
@@ -67,7 +66,7 @@ class SyncFile(val localFile: java.io.File, var driveFile: File, implicit val dr
 
     logger.info("Creating local folders that only exists remotely")
     allChildren
-      .filter(file => file.isRemoteFolder && file.existsRemotely && !file.exists)
+      .filter(file => !localMetaStore.contains(file.path) && file.isRemoteFolder && file.existsRemotely && !file.exists)
       .foreach(_.createLocalFolder)
 
     logger.info("Downloading files that only exists remotely")
@@ -81,17 +80,17 @@ class SyncFile(val localFile: java.io.File, var driveFile: File, implicit val dr
 
     logger.info("Creating remote folders that only exist locally")
     allChildren
-      .filter(file => file.isDirectory && !file.existsRemotely)
+      .filter(file => !localMetaStore.contains(file.path) && file.isDirectory && !file.existsRemotely)
       .foreach(_.createRemoteFolder)
 
     logger.info("Upload files that only exist locally")
     allChildren
-      .filter(file => file.exists && !file.isDirectory && !file.existsRemotely)
+      .filter(file => !localMetaStore.contains(file.path) && file.exists && !file.isDirectory && !file.existsRemotely)
       .foreach(_.upload)
 
     logger.info("Update files that are newer locally and not identical")
     allChildren
-      .filter(file => file.exists &&
+      .filter(file => localMetaStore.contains(file.path) && file.exists &&
         !file.localFile.isDirectory &&
         file.existsRemotely &&
         !file.isIdentical &&
@@ -107,7 +106,13 @@ class SyncFile(val localFile: java.io.File, var driveFile: File, implicit val dr
     logger.info("Delete local files previously synced but no longer existing remotely")
     allChildren
       .filter(file =>
-        file.exists && !file.existsRemotely && localMetaStore.contains(file.path))
+        file.exists && !file.isDirectory && !file.existsRemotely && localMetaStore.contains(file.path))
+      .foreach(_.deleteLocal)
+      
+    logger.info("Delete local directories previously synced but no longer existing remotely")
+    allChildren
+      .filter(file =>
+        file.isDirectory && !file.existsRemotely && localMetaStore.contains(file.path))
       .foreach(_.deleteLocal)
 
     logger.info("Sync completed")
@@ -121,7 +126,8 @@ class SyncFile(val localFile: java.io.File, var driveFile: File, implicit val dr
 
   def createRemoteFolder = {
     logger.info("Creating remote folder for local path " + path)
-    drive.files.insert(driveFile).execute
+    driveFile = drive.files.insert(driveFile).execute
+    children.foreach(file => file.driveFile.setParents(List(new ParentReference().setId(driveFile.getId())).asJava))
     localMetaStore.add(path)
   }
 
@@ -148,6 +154,7 @@ class SyncFile(val localFile: java.io.File, var driveFile: File, implicit val dr
   def deleteRemote = {
     logger.info("Deleting remote file " + path)
     drive.files.delete(id).execute
+    driveFile.setId(null)
     localMetaStore.remove(path)
   }
 
