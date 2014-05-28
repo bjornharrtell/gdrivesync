@@ -16,7 +16,7 @@ class DriveMetaFetcher(implicit drive: Drive, implicit val localMetaStore: Local
   
   def fetchRoot = {
     val driveRootId = drive.about.get.execute.getRootFolderId
-    logger.info("Found Google Drive root with id " + driveRootId)
+    logger.info("Found Google Drive root")
     val driveRoot = new File
     driveRoot.setId(driveRootId)
     var root = new SyncFile(new java.io.File(SYNC_STORE_DIR.getPath, ""), driveRoot, drive, localMetaStore)
