@@ -12,14 +12,14 @@ import Globals.JSON_FACTORY
 import Globals.SYNC_STORE_DIR
 import Globals.httpTransport
 
-class DriveMetaFetcher(implicit drive: Drive) extends LazyLogging {
+class DriveMetaFetcher(implicit drive: Drive, implicit val localMetaStore: LocalMetaStore) extends LazyLogging {
   
   def fetchRoot = {
     val driveRootId = drive.about.get.execute.getRootFolderId
     logger.info("Found Google Drive root with id " + driveRootId)
     val driveRoot = new File
     driveRoot.setId(driveRootId)
-    var root = new SyncFile(new java.io.File(SYNC_STORE_DIR.getPath, ""), driveRoot, drive)
+    var root = new SyncFile(new java.io.File(SYNC_STORE_DIR.getPath, ""), driveRoot, drive, localMetaStore)
     fetchChildren(root)
   }
 
@@ -64,7 +64,7 @@ class DriveMetaFetcher(implicit drive: Drive) extends LazyLogging {
         val isFolder = driveFile.getMimeType == "application/vnd.google-apps.folder"
         val localFile = new java.io.File(folder.path, driveFile.getTitle)
         //logger.debug("Found child with path: " + localFile)
-        val syncFile = new SyncFile(localFile, driveFile, drive)
+        val syncFile = new SyncFile(localFile, driveFile, drive, localMetaStore)
         if (isFolder) findChildren(syncFile)
         syncFile
       })

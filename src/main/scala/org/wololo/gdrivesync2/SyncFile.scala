@@ -14,6 +14,7 @@ import java.io.FileOutputStream
 import scala.io.Source
 import java.nio.file.Files
 import org.apache.commons.io.IOUtils
+import com.google.api.client.http.InputStreamContent
 
 object SyncFile {
   def allChildren(children: ListBuffer[SyncFile]): ListBuffer[SyncFile] = {
@@ -25,8 +26,8 @@ object SyncFile {
   }
 }
 
-class SyncFile(val localFile: java.io.File, val driveFile: File, implicit val drive: Drive) extends LazyLogging {
-  val id = driveFile.getId
+class SyncFile(val localFile: java.io.File, var driveFile: File, implicit val drive: Drive, implicit val localMetaStore: LocalMetaStore) extends LazyLogging {
+  def id = driveFile.getId
   val path = localFile.getPath
   def localMD5 = DigestUtils.md5Hex(new FileInputStream(localFile))
   def isIdentical = localMD5 == driveFile.getMd5Checksum
@@ -41,10 +42,34 @@ class SyncFile(val localFile: java.io.File, val driveFile: File, implicit val dr
 
   def childAtPath(path: java.io.File) = allChildren.find(_.localFile == path)
 
-  def sync(implicit localMetaStore: LocalMetaStore) = {
+  def sync = {
     logger.info("Begin sync of " + allChildren.size + " remote and/or local items")
 
-    // TODO: need to handle case when local and remote file exists but has not been synced
+    logger.info("Updating metastore for directories that already exists locally and remotely")
+    allChildren
+      .filter(file => !localMetaStore.contains(file.path) && file.localFile.isDirectory && file.existsRemotely && file.isRemoteFolder)
+      .foreach(file => localMetaStore.add(file.path))
+      
+    logger.info("Updating metastore for identical files that already exists locally and remotely")
+    allChildren
+      .filter(file => !localMetaStore.contains(file.path) && !file.localFile.isDirectory && file.localFile.exists && file.existsRemotely && file.isIdentical)
+      .foreach(file => localMetaStore.add(file.path))
+      
+    logger.info("Warn about not identical files that already exists locally and remotely and was not previously synced")
+    allChildren
+      .filter(file => !localMetaStore.contains(file.path) && !file.localFile.isDirectory && file.localFile.exists && file.existsRemotely && !file.isIdentical)
+      .foreach(file => {
+        logger.warn("WARNING: " + file.path + " exists locally and remotely, is not identical and was not previously synced. This file will be ignored.")
+      })
+      
+    logger.info("Checkfor  metastore with existing directories")
+    allChildren
+      .filter(file => !localMetaStore.contains(file.path) && !file.localFile.isDirectory && file.localFile.exists && file.existsRemotely && file.isIdentical)
+      .foreach(file => localMetaStore.add(file.path))
+      
+    logger.info("Updating metastore with existing directories")
+    allChildren
+      .filter(file => !localMetaStore.contains(file.path) && file.localFile.isDirectory)
     
     logger.info("Creating local folders that only exists remotely")
     allChildren
@@ -92,50 +117,53 @@ class SyncFile(val localFile: java.io.File, val driveFile: File, implicit val dr
       .filter(file =>
         file.localFile.exists && !file.existsRemotely && localMetaStore.contains(file.path))
       .foreach(_.deleteLocal)
+      
+    logger.info("Sync completed")
   }
 
-  def createLocalFolder(implicit localMetaStore: LocalMetaStore) = {
+  def createLocalFolder = {
     logger.info("Creating local folder at " + path)
     localFile.mkdir
     localMetaStore.add(path)
   }
 
-  def createRemoteFolder(implicit localMetaStore: LocalMetaStore) = {
+  def createRemoteFolder = {
     logger.info("Creating remote folder for local path " + path)
     drive.files.insert(driveFile).execute
     localMetaStore.add(path)
   }
 
-  def download(implicit localMetaStore: LocalMetaStore) = {
+  def download = {
     logger.info("Downloading file " + path)
-    val resp =
-      drive.getRequestFactory.buildGetRequest(new GenericUrl(driveFile.getDownloadUrl))
-        .execute
-    val is = resp.getContent
+    val is = drive.getRequestFactory.buildGetRequest(new GenericUrl(driveFile.getDownloadUrl)).execute.getContent
     IOUtils.copy(is, new FileOutputStream(localFile))
     localMetaStore.add(path)
   }
 
-  def upload(implicit localMetaStore: LocalMetaStore) = {
+  def upload = {
     logger.info("Uploading file " + path)
-    val mediaContent = new FileContent(driveFile.getMimeType, localFile)
-    drive.files.insert(driveFile, mediaContent).execute
+    //val mediaContent = new FileContent(driveFile.getMimeType, localFile)
+    val mediaContent = new InputStreamContent(driveFile.getMimeType, new BufferedInputStream(new FileInputStream(localFile)))
+    mediaContent.setLength(localFile.length)
+    driveFile = drive.files.insert(driveFile, mediaContent).execute
     localMetaStore.add(path)
   }
 
-  def update(implicit localMetaStore: LocalMetaStore) = {
+  def update = {
     logger.info("Updating file " + path)
-    val mediaContent = new FileContent(driveFile.getMimeType, localFile)
-    drive.files.update(id, driveFile, mediaContent).execute
+    //val mediaContent = new FileContent(driveFile.getMimeType, localFile)
+    val mediaContent = new InputStreamContent(driveFile.getMimeType, new BufferedInputStream(new FileInputStream(localFile)))
+    mediaContent.setLength(localFile.length)
+    driveFile = drive.files.update(id, driveFile, mediaContent).execute
   }
 
-  def deleteRemote(implicit localMetaStore: LocalMetaStore) = {
+  def deleteRemote = {
     logger.info("Deleting remote file " + path)
     drive.files.delete(id).execute
     localMetaStore.remove(path)
   }
   
-  def deleteLocal(implicit localMetaStore: LocalMetaStore) = {
+  def deleteLocal = {
     logger.info("Deleting local file " + path)
     localFile.delete
     localMetaStore.remove(path)
