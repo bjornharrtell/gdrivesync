@@ -134,7 +134,7 @@ class SyncFile(val localFile: java.io.File, var driveFile: File, implicit val dr
     val downloader = new MediaHttpDownloader(requestFactory.getTransport, requestFactory.getInitializer)
     downloader.setProgressListener(new MediaHttpDownloaderProgressListener() {
       def progressChanged(downloader: MediaHttpDownloader) {
-        logger.info("Downloaded " + downloader.getProgress * 100 + "%")
+        logger.info("Downloaded " + math.round(downloader.getProgress * 100) + "%")
       }
     })
     downloader.download(new GenericUrl(downloadUrl), new FileOutputStream(localFile))
@@ -150,7 +150,7 @@ class SyncFile(val localFile: java.io.File, var driveFile: File, implicit val dr
     request.getMediaHttpUploader.setProgressListener(new MediaHttpUploaderProgressListener() {
       def progressChanged(uploader: MediaHttpUploader) {
         if (uploader.getUploadState != UploadState.INITIATION_STARTED) {
-          logger.info("Uploaded " + uploader.getProgress * 100 + "%")
+          logger.info("Uploaded " + math.round(uploader.getProgress * 100) + "%")
         }
       }
     })
