@@ -4,8 +4,6 @@ import org.mapdb.DBMaker
 import Globals.DATA_STORE_DIR
 import Globals.SYNC_STORE_DIR
 
-// TODO: use relative paths so that metastore can be used after moving destination
-
 class LocalMetaStore {
   var db = DBMaker.newFileDB(new java.io.File(DATA_STORE_DIR, "metadb"))
     .closeOnJvmShutdown
@@ -18,7 +16,7 @@ class LocalMetaStore {
     db.compact
   }
   
-  def relativePath(path: String) = path.substring(SYNC_STORE_DIR.getPath().length)
+  def relativePath(path: String) = path.substring(SYNC_STORE_DIR.getPath.length)
 
   def add(path: String) = {
     set.add(relativePath(path))
