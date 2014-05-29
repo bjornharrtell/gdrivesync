@@ -3,22 +3,21 @@ package org.wololo.gdrivesync
 import java.io.BufferedInputStream
 import java.io.FileInputStream
 import java.io.FileOutputStream
+
+import scala.collection.JavaConverters.seqAsJavaListConverter
 import scala.collection.mutable.ListBuffer
-import org.apache.commons.codec.digest.DigestUtils
+
+import com.google.api.client.googleapis.media.MediaHttpDownloader
+import com.google.api.client.googleapis.media.MediaHttpDownloaderProgressListener
+import com.google.api.client.googleapis.media.MediaHttpUploader
+import com.google.api.client.googleapis.media.MediaHttpUploader.UploadState
+import com.google.api.client.googleapis.media.MediaHttpUploaderProgressListener
 import com.google.api.client.http.GenericUrl
 import com.google.api.client.http.InputStreamContent
 import com.google.api.services.drive.Drive
 import com.google.api.services.drive.model.File
-import com.typesafe.scalalogging.slf4j.LazyLogging
 import com.google.api.services.drive.model.ParentReference
-import scala.collection.JavaConverters._
-import java.security.MessageDigest
-import java.security.DigestInputStream
-import java.io.ObjectInputStream
-import org.apache.commons.codec.binary.Hex
-import javax.xml.bind.annotation.adapters.HexBinaryAdapter
-import java.io.InputStream
-import java.io.OutputStream
+import com.typesafe.scalalogging.slf4j.LazyLogging
 
 object SyncFile {
   def allChildren(children: ListBuffer[SyncFile]): ListBuffer[SyncFile] = {
@@ -33,6 +32,12 @@ object SyncFile {
 class SyncFile(val localFile: java.io.File, var driveFile: File, implicit val drive: Drive, implicit val localMetaStore: LocalMetaStore) extends LazyLogging {
   def id = driveFile.getId
   val path = localFile.getPath
+  def localMD5 = Digest.hexMD5(localFile)
+
+  val children = ListBuffer[SyncFile]()
+  def allChildren = SyncFile.allChildren(children)
+  def childAtPath(path: java.io.File) = allChildren.find(_.localFile == path)
+
   def isIdentical = localMD5 == driveFile.getMd5Checksum
   def isDirectory = localFile.isDirectory
   def isRemoteFolder = driveFile.getMimeType == "application/vnd.google-apps.folder"
@@ -41,104 +46,68 @@ class SyncFile(val localFile: java.io.File, var driveFile: File, implicit val dr
   def lastModified = localFile.lastModified
   def remoteLastModified = driveFile.getModifiedDate.getValue
   def localIsNewer = lastModified > remoteLastModified
+  def remoteIsNewer = lastModified < remoteLastModified
   def mimeType = driveFile.getMimeType
   def downloadUrl = driveFile.getDownloadUrl
+  def canBeDownloaded = downloadUrl != null
+
   def wasSynced = localMetaStore.contains(path)
   def addSynced = localMetaStore.add(path)
   def removeSynced = localMetaStore.remove(path)
 
-  val buffer = Array.ofDim[Byte](1024 * 8)
+  def unsyncedIdenticalDir = !wasSynced && isDirectory && existsRemotely && isRemoteFolder
+  def unsyncedIdenticalFile = !wasSynced && !isDirectory && exists && existsRemotely && isIdentical
+  def unsyncedNotIdentical = !wasSynced && !isDirectory && exists && existsRemotely && isIdentical
+  def unsyncedRemoteDir = !wasSynced && isRemoteFolder && existsRemotely && !exists
+  def unsyncedRemoteFile = !isRemoteFolder && existsRemotely && canBeDownloaded && !exists && !wasSynced
+  def unsyncedLocalDir = !wasSynced && isDirectory && !existsRemotely
+  def unsyncedLocalFile = !wasSynced && exists && !isDirectory && !existsRemotely
+  def syncedRemoteNewerFile = wasSynced && !isRemoteFolder && existsRemotely && canBeDownloaded && exists && !isDirectory && !isIdentical && remoteIsNewer
+  def syncedLocalNewer = wasSynced && exists && !isDirectory && existsRemotely && !isIdentical && localIsNewer
+  def syncedOnlyRemote = !exists && existsRemotely && wasSynced
+  def syncedOnlyLocalFile = exists && !isDirectory && !existsRemotely && wasSynced
+  def syncedOnlyLocalDir = isDirectory && !existsRemotely && wasSynced
 
-  def localMD5 = {
-    val fis = new FileInputStream(localFile)
-    val md = MessageDigest.getInstance("MD5")
-
-    var read = 0;
-    do {
-      read = fis.read(buffer)
-      if (read > 0) md.update(buffer, 0, read)
-    } while (read != -1)
-    fis.close
-
-    new HexBinaryAdapter().marshal(md.digest).toLowerCase
-  }
-
-  val children = ListBuffer[SyncFile]()
-
-  def allChildren = SyncFile.allChildren(children)
-
-  def childAtPath(path: java.io.File) = allChildren.find(_.localFile == path)
+  def warnIgnored = logger.warn("WARNING: Ignoring " + path + " as it exists locally and remotely is not identical and was not previously synced")
 
   def sync = {
     logger.info("Begin sync of " + allChildren.size + " remote and/or local items")
 
-    logger.info("Updating metastore for directories that already exists locally and remotely")
-    allChildren
-      .filter(file => !file.wasSynced && file.isDirectory && file.existsRemotely && file.isRemoteFolder)
-      .foreach(file => file.addSynced)
+    logger.info("Determine directories that already exists locally and remotely")
+    allChildren.filter(_.unsyncedIdenticalDir).foreach(file => file.addSynced)
 
-    logger.info("Updating metastore for identical files that already exists locally and remotely")
-    allChildren
-      .filter(file => !file.wasSynced && !file.isDirectory && file.exists && file.existsRemotely && file.isIdentical)
-      .foreach(file => file.addSynced)
+    logger.info("Determine identical files that already exists locally and remotely")
+    allChildren.filter(_.unsyncedIdenticalFile).foreach(_.addSynced)
 
-    logger.info("Warn about not identical files that already exists locally and remotely and was not previously synced")
-    allChildren
-      .filter(file => !file.wasSynced && !file.isDirectory && file.exists && file.existsRemotely && !file.isIdentical)
-      .foreach(file => {
-        logger.warn("WARNING: Ignoring " + file.path + " as it exists locally and remotely is not identical and was not previously synced")
-      })
+    logger.info("Determine not identical files that already exists locally and remotely and was not previously synced")
+    allChildren.filter(_.unsyncedNotIdentical).foreach(_.warnIgnored)
 
     logger.info("Creating local folders that only exists remotely")
-    allChildren
-      .filter(file => !file.wasSynced && file.isRemoteFolder && file.existsRemotely && !file.exists)
-      .foreach(_.createLocalFolder)
+    allChildren.filter(_.unsyncedRemoteDir).foreach(_.createLocalFolder)
 
-    logger.info("Downloading files that only exists remotely")
-    allChildren
-      .filter(file => !file.isRemoteFolder &&
-        file.existsRemotely &&
-        file.driveFile.getDownloadUrl != null &&
-        !file.exists &&
-        !file.wasSynced)
-      .foreach(_.download)
+    logger.info("Determine unsynced remote files")
+    allChildren.filter(_.unsyncedRemoteFile).foreach(_.download)
 
-    logger.info("Creating remote folders that only exist locally")
-    allChildren
-      .filter(file => !file.wasSynced && file.isDirectory && !file.existsRemotely)
-      .foreach(_.createRemoteFolder)
+    logger.info("Determine newer remote files")
+    allChildren.filter(_.syncedRemoteNewerFile).foreach(_.download)
 
-    logger.info("Upload files that only exist locally")
-    allChildren
-      .filter(file => !file.wasSynced && file.exists && !file.isDirectory && !file.existsRemotely)
-      .foreach(_.upload)
+    logger.info("Determine unsynced local folders")
+    allChildren.filter(_.unsyncedLocalDir).foreach(_.createRemoteFolder)
 
-    logger.info("Update files that are newer locally and not identical")
-    allChildren
-      .filter(file => file.wasSynced && file.exists &&
-        !file.isDirectory &&
-        file.existsRemotely &&
-        !file.isIdentical &&
-        file.localIsNewer)
-      .foreach(_.update)
+    logger.info("Determine unsynced local files")
+    allChildren.filter(_.unsyncedLocalFile).foreach(_.upload)
 
-    logger.info("Delete remote files previously synced but no longer existing locally")
-    allChildren
-      .filter(file =>
-        !file.exists && file.existsRemotely && file.wasSynced)
-      .foreach(_.deleteRemote)
+    logger.info("Determine newer local files")
+    allChildren.filter(_.syncedLocalNewer).foreach(_.update)
 
-    logger.info("Delete local files previously synced but no longer existing remotely")
-    allChildren
-      .filter(file =>
-        file.exists && !file.isDirectory && !file.existsRemotely && file.wasSynced)
-      .foreach(_.deleteLocal)
+    logger.info("Determine items to be remotely deleted")
+    allChildren.filter(_.syncedOnlyRemote).foreach(_.deleteRemote)
 
-    logger.info("Delete local directories previously synced but no longer existing remotely")
-    allChildren
-      .filter(file =>
-        file.isDirectory && !file.existsRemotely && file.wasSynced)
-      .foreach(_.deleteLocal)
+    logger.info("Determine files to be locally deleted")
+    allChildren.filter(_.syncedOnlyLocalFile).foreach(_.deleteLocal)
+
+    logger.info("Determine directories to be locally deleted")
+    allChildren.filter(_.syncedOnlyLocalDir).foreach(_.deleteLocal)
 
     logger.info("Sync completed")
   }
@@ -158,16 +127,18 @@ class SyncFile(val localFile: java.io.File, var driveFile: File, implicit val dr
 
   def download = {
     logger.info("Downloading file " + path)
-
-    def copyLarge(input: InputStream, output: OutputStream) {
-      var n = 0
-      while (-1 != { n = input.read(buffer); n }) {
-        output.write(buffer, 0, n)
-      }
+    if (exists) {
+      localFile.delete
     }
-
-    val is = drive.getRequestFactory.buildGetRequest(new GenericUrl(downloadUrl)).execute.getContent
-    copyLarge(is, new FileOutputStream(localFile))
+    val requestFactory = drive.getRequestFactory
+    val downloader = new MediaHttpDownloader(requestFactory.getTransport, requestFactory.getInitializer)
+    downloader.setProgressListener(new MediaHttpDownloaderProgressListener() {
+      def progressChanged(downloader: MediaHttpDownloader) {
+        logger.info("Downloaded " + downloader.getProgress * 100 + "%")
+      }
+    })
+    downloader.download(new GenericUrl(downloadUrl), new FileOutputStream(localFile))
+    localFile.setLastModified(remoteLastModified)
     addSynced
   }
 
@@ -175,7 +146,15 @@ class SyncFile(val localFile: java.io.File, var driveFile: File, implicit val dr
 
   def upload = {
     logger.info("Uploading file " + path)
-    driveFile = drive.files.insert(driveFile, mediaContent(localFile.length)).execute
+    var request = drive.files.insert(driveFile, mediaContent(localFile.length))
+    request.getMediaHttpUploader.setProgressListener(new MediaHttpUploaderProgressListener() {
+      def progressChanged(uploader: MediaHttpUploader) {
+        if (uploader.getUploadState != UploadState.INITIATION_STARTED) {
+          logger.info("Uploaded " + uploader.getProgress * 100 + "%")
+        }
+      }
+    })
+    driveFile = request.execute
     addSynced
   }
 

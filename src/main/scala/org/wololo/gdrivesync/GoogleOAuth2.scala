@@ -31,7 +31,7 @@ object GoogleOAuth2 extends LazyLogging {
     val credential = new AuthorizationCodeInstalledApp(flow, new LocalServerReceiver())
       .authorize("user")
 
-    logger.debug("Authorized with Google Drive")
+    logger.info("Authorized with Google Drive")
 
     credential
   }
