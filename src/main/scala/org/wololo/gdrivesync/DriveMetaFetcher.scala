@@ -25,6 +25,8 @@ class DriveMetaFetcher(implicit drive: Drive, implicit val localMetaStore: Local
 
   def fetchChildren(root: SyncFile) = {
     val request = drive.files.list
+    request.setFields("kind,nextPageToken,nextLink,items(id,title,mimeType,modifiedDate,parents,downloadUrl,md5Checksum,owners(isAuthenticatedUser))")
+    request.setQ("trashed=false")
     request.setMaxResults(200)
     val result = ListBuffer[File]()
     do {

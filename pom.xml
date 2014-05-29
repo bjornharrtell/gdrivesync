@@ -3,7 +3,7 @@
 	<modelVersion>4.0.0</modelVersion>
 	<groupId>org.wololo</groupId>
 	<artifactId>gdrivesync</artifactId>
-	<version>0.2.2</version>
+	<version>0.2.3</version>
 	<name>gdrivesync</name>
 
 	<dependencies>
