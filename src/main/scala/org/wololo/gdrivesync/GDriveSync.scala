@@ -1,4 +1,4 @@
-package org.wololo.gdrivesync2
+package org.wololo.gdrivesync
 
 import java.sql.DriverManager
 import com.google.api.services.drive.Drive
@@ -9,7 +9,7 @@ import Globals.httpTransport
 import Globals.DATA_STORE_DIR
 import org.mapdb.DBMaker
 import org.clapper.argot._
-object GDriveSync2 extends App with LazyLogging {
+object GDriveSync extends App with LazyLogging {
 
   implicit val localMetaStore = new LocalMetaStore()
 

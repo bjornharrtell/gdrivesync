@@ -1,4 +1,4 @@
-package org.wololo.gdrivesync2
+package org.wololo.gdrivesync
 
 import scala.collection.JavaConversions.asScalaBuffer
 import scala.collection.mutable.ListBuffer

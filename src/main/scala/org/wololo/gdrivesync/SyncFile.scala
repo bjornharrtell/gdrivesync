@@ -1,4 +1,4 @@
-package org.wololo.gdrivesync2
+package org.wololo.gdrivesync
 
 import java.io.BufferedInputStream
 import java.io.FileInputStream

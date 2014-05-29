@@ -1,4 +1,4 @@
-package org.wololo.gdrivesync2
+package org.wololo.gdrivesync
 
 import org.mapdb.DBMaker
 import Globals.DATA_STORE_DIR

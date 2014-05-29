@@ -1,4 +1,4 @@
-package org.wololo.gdrivesync2
+package org.wololo.gdrivesync
 
 import com.google.api.services.drive.model.File
 import com.typesafe.scalalogging.slf4j.LazyLogging

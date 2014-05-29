@@ -1,4 +1,4 @@
-package org.wololo.gdrivesync2
+package org.wololo.gdrivesync
 
 import java.io.InputStreamReader
 
@@ -20,7 +20,7 @@ object GoogleOAuth2 extends LazyLogging {
   def authorize = {
     val dataStoreFactory = new FileDataStoreFactory(DATA_STORE_DIR);
 
-    val clientSecretsStream = GDriveSync2.getClass.getResourceAsStream("/client_secrets.json")
+    val clientSecretsStream = GDriveSync.getClass.getResourceAsStream("/client_secrets.json")
     val clientSecrets = GoogleClientSecrets
       .load(JSON_FACTORY, new InputStreamReader(clientSecretsStream))
 
