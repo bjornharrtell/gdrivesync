@@ -2,32 +2,50 @@ package org.wololo.gdrivesync
 
 import scala.collection.JavaConversions.asScalaBuffer
 import scala.collection.mutable.ListBuffer
-
 import com.google.api.client.auth.oauth2.Credential
 import com.google.api.services.drive.Drive
 import com.google.api.services.drive.model.File
 import com.typesafe.scalalogging.slf4j.LazyLogging
-
 import Globals.JSON_FACTORY
 import Globals.SYNC_STORE_DIR
 import Globals.httpTransport
+import com.google.api.services.drive.model.ChildReference
+
+object DriveMetaFetcher {
+  val MAX_RESULTS = 400
+}
 
 class DriveMetaFetcher(implicit drive: Drive, implicit val localMetaStore: LocalMetaStore) extends LazyLogging {
-  
+
   def fetchRoot = {
     val driveRootId = drive.about.get.execute.getRootFolderId
     logger.info("Found Google Drive root")
     val driveRoot = new File
     driveRoot.setId(driveRootId)
     var root = new SyncFile(new java.io.File(SYNC_STORE_DIR.getPath, ""), driveRoot, drive, localMetaStore)
-    fetchChildren(root)
+    fetchItems(root)
   }
 
-  def fetchChildren(root: SyncFile) = {
+  def fetchChildren(folder: SyncFile) = {
+    val request = drive.children.list(folder.id)
+    request.setFields("kind,nextPageToken,nextLink,items(id)")
+    request.setMaxResults(DriveMetaFetcher.MAX_RESULTS)
+    val result = ListBuffer[ChildReference]()
+    do {
+      val children = request.execute
+      val items = children.getItems
+      logger.info("Fetched " + items.length + " Google Drive items")
+      result ++= items
+      request.setPageToken(children.getNextPageToken)
+    } while (request.getPageToken != null && request.getPageToken.length > 0)
+    result
+  }
+
+  def fetchItems(root: SyncFile) = {
     val request = drive.files.list
     request.setFields("kind,nextPageToken,nextLink,items(id,title,mimeType,modifiedDate,parents,downloadUrl,md5Checksum,owners(isAuthenticatedUser))")
     request.setQ("trashed=false")
-    request.setMaxResults(200)
+    request.setMaxResults(DriveMetaFetcher.MAX_RESULTS)
     val result = ListBuffer[File]()
     do {
       val files = request.execute

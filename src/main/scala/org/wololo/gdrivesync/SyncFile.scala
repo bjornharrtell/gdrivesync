@@ -59,14 +59,15 @@ class SyncFile(val localFile: java.io.File, var driveFile: File, implicit val dr
   def unsyncedIdenticalFile = !wasSynced && !isDirectory && exists && existsRemotely && isIdentical
   def unsyncedNotIdentical = !wasSynced && !isDirectory && exists && existsRemotely && isIdentical
   def unsyncedRemoteDir = !wasSynced && isRemoteFolder && existsRemotely && !exists
-  def unsyncedRemoteFile = !isRemoteFolder && existsRemotely && canBeDownloaded && !exists && !wasSynced
+  def unsyncedRemoteFile = !wasSynced && !isRemoteFolder && existsRemotely && canBeDownloaded && !exists
   def unsyncedLocalDir = !wasSynced && isDirectory && !existsRemotely
   def unsyncedLocalFile = !wasSynced && exists && !isDirectory && !existsRemotely
-  def syncedRemoteNewerFile = wasSynced && !isRemoteFolder && existsRemotely && canBeDownloaded && exists && !isDirectory && !isIdentical && remoteIsNewer
+  def syncedRemoteNewerFile = wasSynced && !isRemoteFolder && existsRemotely && canBeDownloaded && exists && !isDirectory && remoteIsNewer && !isIdentical
   def syncedLocalNewer = wasSynced && exists && !isDirectory && existsRemotely && !isIdentical && localIsNewer
-  def syncedOnlyRemote = !exists && existsRemotely && wasSynced
-  def syncedOnlyLocalFile = exists && !isDirectory && !existsRemotely && wasSynced
-  def syncedOnlyLocalDir = isDirectory && !existsRemotely && wasSynced
+  def syncedOnlyRemoteFile = wasSynced && !exists && existsRemotely  && !isRemoteFolder
+  def syncedOnlyRemoteDir = wasSynced && !exists && existsRemotely && isRemoteFolder
+  def syncedOnlyLocalFile = wasSynced && exists && !isDirectory && !existsRemotely
+  def syncedOnlyLocalDir = wasSynced && isDirectory && !existsRemotely
 
   def warnIgnored = logger.warn("WARNING: Ignoring " + path + " as it exists locally and remotely is not identical and was not previously synced")
 
@@ -100,13 +101,17 @@ class SyncFile(val localFile: java.io.File, var driveFile: File, implicit val dr
     logger.info("Determine newer local files")
     allChildren.filter(_.syncedLocalNewer).foreach(_.update)
 
-    logger.info("Determine items to be remotely deleted")
-    allChildren.filter(_.syncedOnlyRemote).foreach(_.deleteRemote)
+    // NOTE: do not delete folders first, as they could contain unsyncable stuff
+    logger.info("Determine files to be remotely deleted")
+    allChildren.filter(_.syncedOnlyRemoteFile).foreach(_.deleteRemote)
+    
+    logger.info("Determine folders to be remotely deleted")
+    allChildren.filter(_.syncedOnlyRemoteDir).foreach(_.deleteRemote)
 
     logger.info("Determine files to be locally deleted")
     allChildren.filter(_.syncedOnlyLocalFile).foreach(_.deleteLocal)
 
-    logger.info("Determine directories to be locally deleted")
+    logger.info("Determine folders to be locally deleted")
     allChildren.filter(_.syncedOnlyLocalDir).foreach(_.deleteLocal)
 
     logger.info("Sync completed")
@@ -164,10 +169,23 @@ class SyncFile(val localFile: java.io.File, var driveFile: File, implicit val dr
   }
 
   def deleteRemote = {
-    logger.info("Deleting remote file " + path)
-    drive.files.delete(id).execute
-    driveFile.setId(null)
-    removeSynced
+    def delete = {
+      drive.files.delete(id).execute
+      driveFile.setId(null)
+      removeSynced
+    }
+    if (isRemoteFolder) {
+      // NOTE: make sure to check if folder is empty before deleting it
+      if (new DriveMetaFetcher().fetchChildren(this).length == 0) {
+        logger.info("Deleting remote dir " + path)
+        delete
+      } else {
+        logger.warn("Ignoring non-empty remote dir " + path)
+      }
+    } else {
+      logger.info("Deleting remote file " + path)
+      delete
+    }
   }
 
   def deleteLocal = {
