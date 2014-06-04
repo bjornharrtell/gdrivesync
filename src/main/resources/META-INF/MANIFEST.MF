@@ -1,0 +1,7 @@
+Manifest-Version: 1.0
+Build-Jdk: 1.7.0_55
+Built-By: bjorn
+Created-By: Apache Maven
+Main-Class: org.wololo.gdrivesync.GDriveSync
+Archiver-Version: Plexus Archiver
+

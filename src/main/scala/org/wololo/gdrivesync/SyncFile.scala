@@ -62,7 +62,7 @@ class SyncFile(val localFile: java.io.File, var driveFile: File, implicit val dr
   def unsyncedLocalDir = !wasSynced && isDirectory && !existsRemotely
   def unsyncedLocalFile = !wasSynced && exists && !isDirectory && !existsRemotely
   def syncedRemoteNewerFile = wasSynced && !isRemoteFolder && existsRemotely && canBeDownloaded && exists && !isDirectory && remoteIsNewer && !isIdentical
-  def syncedLocalNewer = wasSynced && exists && !isDirectory && existsRemotely && !isIdentical && localIsNewer
+  def syncedLocalNewer = wasSynced && exists && !isDirectory && existsRemotely && localIsNewer && !isIdentical
   def syncedOnlyRemoteFile = wasSynced && !exists && existsRemotely  && !isRemoteFolder
   def syncedOnlyRemoteDir = wasSynced && !exists && existsRemotely && isRemoteFolder
   def syncedOnlyLocalFile = wasSynced && exists && !isDirectory && !existsRemotely
