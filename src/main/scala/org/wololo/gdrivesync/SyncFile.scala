@@ -3,10 +3,8 @@ package org.wololo.gdrivesync
 import java.io.BufferedInputStream
 import java.io.FileInputStream
 import java.io.FileOutputStream
-
 import scala.collection.JavaConverters.seqAsJavaListConverter
 import scala.collection.mutable.ListBuffer
-
 import com.google.api.client.googleapis.media.MediaHttpDownloader
 import com.google.api.client.googleapis.media.MediaHttpDownloaderProgressListener
 import com.google.api.client.googleapis.media.MediaHttpUploader
@@ -18,6 +16,7 @@ import com.google.api.services.drive.Drive
 import com.google.api.services.drive.model.File
 import com.google.api.services.drive.model.ParentReference
 import com.typesafe.scalalogging.slf4j.LazyLogging
+import com.google.api.client.googleapis.json.GoogleJsonResponseException
 
 object SyncFile {
   def allChildren(children: ListBuffer[SyncFile]): ListBuffer[SyncFile] = {
@@ -125,9 +124,15 @@ class SyncFile(val localFile: java.io.File, var driveFile: File, implicit val dr
 
   def createRemoteFolder = {
     logger.info("Creating remote folder for local path " + path)
-    driveFile = drive.files.insert(driveFile).execute
-    children.foreach(_.driveFile.setParents(List(new ParentReference().setId(driveFile.getId())).asJava))
-    addSynced
+    val request = drive.files.insert(driveFile)
+    try {
+      driveFile = request.execute
+      children.foreach(_.driveFile.setParents(List(new ParentReference().setId(driveFile.getId())).asJava))
+      addSynced
+    } catch {
+      case e: GoogleJsonResponseException => logger.error("Creation of remote folder failed", e)
+    }
+    
   }
 
   def download = {
@@ -143,9 +148,13 @@ class SyncFile(val localFile: java.io.File, var driveFile: File, implicit val dr
         logger.info("Downloaded " + math.round(downloader.getProgress * 100) + "%")
       }
     })*/
-    downloader.download(new GenericUrl(downloadUrl), new FileOutputStream(localFile))
-    localFile.setLastModified(remoteLastModified)
-    addSynced
+    try {
+      downloader.download(new GenericUrl(downloadUrl), new FileOutputStream(localFile))
+      localFile.setLastModified(remoteLastModified)
+      addSynced
+    } catch {
+      case e: GoogleJsonResponseException => logger.error("Download failed", e)
+    }
   }
 
   def mediaContent(length: Long) = new InputStreamContent(mimeType, new BufferedInputStream(new FileInputStream(localFile))).setLength(length)
@@ -161,20 +170,34 @@ class SyncFile(val localFile: java.io.File, var driveFile: File, implicit val dr
         }
       }
     })*/
-    driveFile = request.execute
-    addSynced
+    try {
+      driveFile = request.execute
+      addSynced
+    } catch {
+      case e: GoogleJsonResponseException => logger.error("Upload failed", e)
+    }
   }
 
   def update = {
     logger.info("Updating file " + path)
-    driveFile = drive.files.update(id, driveFile, mediaContent(localFile.length)).execute
+    val request = drive.files.update(id, driveFile, mediaContent(localFile.length))
+    try {
+      driveFile = request.execute
+    } catch {
+      case e: GoogleJsonResponseException => logger.error("Update failed", e)
+    }
   }
 
   def deleteRemote = {
     def delete = {
-      drive.files.delete(id).execute
-      driveFile.setId(null)
-      removeSynced
+      val request = drive.files.delete(id)
+      try {
+        request.execute
+        driveFile.setId(null)
+        removeSynced
+      } catch {
+        case e: GoogleJsonResponseException => logger.error("Delete remote failed", e)
+      }
     }
     if (isRemoteFolder) {
       // NOTE: make sure to check if folder is empty before deleting it
