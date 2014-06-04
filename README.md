@@ -2,7 +2,7 @@
 
 Command line client written in Scala to sync Google Drive contents to a local folder.
 
-Run with `java -jar gdrivesync-0.2.3.jar`.
+Run with `java -jar gdrivesync-0.2.5.jar`.
 
 ```
     Usage: gdrivesync [OPTIONS]
