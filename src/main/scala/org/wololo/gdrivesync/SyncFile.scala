@@ -142,7 +142,7 @@ class SyncFile(val localFile: java.io.File, var driveFile: File, implicit val dr
     }
     val requestFactory = drive.getRequestFactory
     val downloader = new MediaHttpDownloader(requestFactory.getTransport, requestFactory.getInitializer)
-    downloader.setDirectDownloadEnabled(true)
+    downloader.setDirectDownloadEnabled(false)
     /*downloader.setProgressListener(new MediaHttpDownloaderProgressListener() {
       def progressChanged(downloader: MediaHttpDownloader) {
         logger.info("Downloaded " + math.round(downloader.getProgress * 100) + "%")
@@ -162,7 +162,7 @@ class SyncFile(val localFile: java.io.File, var driveFile: File, implicit val dr
   def upload = {
     logger.info("Uploading file " + path)
     var request = drive.files.insert(driveFile, mediaContent(localFile.length))
-    request.getMediaHttpUploader.setDirectUploadEnabled(true)
+    request.getMediaHttpUploader.setDirectUploadEnabled(false)
     /*request.getMediaHttpUploader.setProgressListener(new MediaHttpUploaderProgressListener() {
       def progressChanged(uploader: MediaHttpUploader) {
         if (uploader.getUploadState != UploadState.INITIATION_STARTED) {

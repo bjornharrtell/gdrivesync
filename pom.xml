@@ -3,39 +3,39 @@
 	<modelVersion>4.0.0</modelVersion>
 	<groupId>org.wololo</groupId>
 	<artifactId>gdrivesync</artifactId>
-	<version>0.2.5</version>
+	<version>0.2.6</version>
 	<name>gdrivesync</name>
 
 	<dependencies>
 		<dependency>
 			<groupId>com.google.api-client</groupId>
 			<artifactId>google-api-client</artifactId>
-			<version>1.18.0-rc</version>
+			<version>1.19.0</version>
 		</dependency>
 		<dependency>
 			<groupId>com.google.api-client</groupId>
 			<artifactId>google-api-client-jackson2</artifactId>
-			<version>1.18.0-rc</version>
+			<version>1.19.0</version>
 		</dependency>
 		<dependency>
 			<groupId>com.google.apis</groupId>
 			<artifactId>google-api-services-drive</artifactId>
-			<version>v2-rev126-1.18.0-rc</version>
+			<version>v2-rev145-1.19.0</version>
 		</dependency>
 		<dependency>
 			<groupId>com.google.api-client</groupId>
 			<artifactId>google-api-client-java6</artifactId>
-			<version>1.18.0-rc</version>
+			<version>1.19.0</version>
 		</dependency>
 		<dependency>
 			<groupId>com.google.oauth-client</groupId>
 			<artifactId>google-oauth-client-java6</artifactId>
-			<version>1.18.0-rc</version>
+			<version>1.19.0</version>
 		</dependency>
 		<dependency>
 			<groupId>com.google.oauth-client</groupId>
 			<artifactId>google-oauth-client-jetty</artifactId>
-			<version>1.18.0-rc</version>
+			<version>1.19.0</version>
 		</dependency>
 		<dependency>
 			<groupId>com.typesafe.scala-logging</groupId>
@@ -50,12 +50,12 @@
 		<dependency>
 			<groupId>org.mapdb</groupId>
 			<artifactId>mapdb</artifactId>
-			<version>1.0.1</version>
+			<version>1.0.6</version>
 		</dependency>
 		<dependency>
 			<groupId>org.clapper</groupId>
 			<artifactId>argot_2.11</artifactId>
-			<version>1.0.2</version>
+			<version>1.0.3</version>
 		</dependency>
 	</dependencies>
 
@@ -66,11 +66,20 @@
 			<plugin>
 				<groupId>net.alchim31.maven</groupId>
 				<artifactId>scala-maven-plugin</artifactId>
-				<version>3.1.6</version>
+				<version>3.2.0</version>
+				<executions>
+                    <execution>
+                        <goals>
+                            <goal>compile</goal>
+                            <goal>testCompile</goal>
+                        </goals>
+                    </execution>
+                </executions>
 			</plugin>
 			<plugin>
                 <groupId>org.apache.maven.plugins</groupId>
                 <artifactId>maven-jar-plugin</artifactId>
+                <version>2.5</version>
                 <configuration>
                   <archive>
                     <manifestFile>src/main/resources/META-INF/MANIFEST.MF</manifestFile>
@@ -80,7 +89,7 @@
 			<plugin>
                 <groupId>com.github.wvengen</groupId>
                 <artifactId>proguard-maven-plugin</artifactId>
-                <version>2.0.7</version>
+                <version>2.0.8</version>
                 <executions>
                    <execution>
                        <phase>package</phase>
@@ -97,13 +106,14 @@
                     <dependency>
                         <groupId>net.sf.proguard</groupId>
                         <artifactId>proguard-base</artifactId>
-                        <version>4.11</version>
+                        <version>5.0</version>
                         <scope>runtime</scope>
                     </dependency>
                 </dependencies>
             </plugin>
 			<plugin>
 				<artifactId>maven-compiler-plugin</artifactId>
+				<version>3.1</version>
 				<configuration>
 					<source>1.7</source>
 					<target>1.7</target>
