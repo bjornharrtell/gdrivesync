@@ -3,29 +3,29 @@
 	<modelVersion>4.0.0</modelVersion>
 	<groupId>org.wololo</groupId>
 	<artifactId>gdrivesync</artifactId>
-	<version>0.2.6</version>
+	<version>0.2.7</version>
 	<name>gdrivesync</name>
 
 	<dependencies>
 		<dependency>
 			<groupId>com.google.api-client</groupId>
 			<artifactId>google-api-client</artifactId>
-			<version>1.19.0</version>
+			<version>1.19.1</version>
 		</dependency>
 		<dependency>
 			<groupId>com.google.api-client</groupId>
 			<artifactId>google-api-client-jackson2</artifactId>
-			<version>1.19.0</version>
+			<version>1.19.1</version>
 		</dependency>
 		<dependency>
 			<groupId>com.google.apis</groupId>
 			<artifactId>google-api-services-drive</artifactId>
-			<version>v2-rev145-1.19.0</version>
+			<version>v2-rev155-1.19.0</version>
 		</dependency>
 		<dependency>
 			<groupId>com.google.api-client</groupId>
 			<artifactId>google-api-client-java6</artifactId>
-			<version>1.19.0</version>
+			<version>1.19.1</version>
 		</dependency>
 		<dependency>
 			<groupId>com.google.oauth-client</groupId>
@@ -98,8 +98,10 @@
                 </executions>
                 <configuration>
                     <includeDependencyInjar>true</includeDependencyInjar>
+                    <proguardInclude>${basedir}/proguard.conf</proguardInclude>
                     <libs>
                         <lib>${java.home}/lib/rt.jar</lib>
+                        <lib>${java.home}/lib/jsse.jar</lib>
                     </libs>
                 </configuration>
                 <dependencies>
@@ -113,7 +115,7 @@
             </plugin>
 			<plugin>
 				<artifactId>maven-compiler-plugin</artifactId>
-				<version>3.1</version>
+				<version>3.2</version>
 				<configuration>
 					<source>1.7</source>
 					<target>1.7</target>
