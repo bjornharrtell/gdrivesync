@@ -18,6 +18,9 @@ import com.google.api.services.drive.model.ParentReference
 import com.typesafe.scalalogging.slf4j.LazyLogging
 import com.google.api.client.googleapis.json.GoogleJsonResponseException
 import resource._
+import scala.util.Try
+import scala.util.Success
+import scala.util.Failure
 
 object SyncFile {
   def allChildren(children: ListBuffer[SyncFile]): ListBuffer[SyncFile] = {
@@ -126,14 +129,13 @@ class SyncFile(val localFile: java.io.File, var driveFile: File, implicit val dr
   def createRemoteFolder = {
     logger.info("Creating remote folder for local path " + path)
     val request = drive.files.insert(driveFile)
-    try {
-      driveFile = request.execute
-      children.foreach(_.driveFile.setParents(List(new ParentReference().setId(driveFile.getId())).asJava))
-      addSynced
-    } catch {
-      case e: GoogleJsonResponseException => logger.error("Creation of remote folder failed", e)
+    Try(request.execute) match {
+      case Success(response) =>
+        driveFile = response
+        children.foreach(_.driveFile.setParents(List(new ParentReference().setId(driveFile.getId())).asJava))
+        addSynced
+      case Failure(e) => logger.error("Creation of remote folder failed", e)
     }
-    
   }
 
   def download = {
@@ -149,14 +151,13 @@ class SyncFile(val localFile: java.io.File, var driveFile: File, implicit val dr
         logger.info("Downloaded " + math.round(downloader.getProgress * 100) + "%")
       }
     })*/
-    try {
-      for(output <- managed(new FileOutputStream(localFile))) {
-        downloader.download(new GenericUrl(downloadUrl), output)
+    for(output <- managed(new FileOutputStream(localFile))) {
+      Try(downloader.download(new GenericUrl(downloadUrl), output)) match {
+        case Success(_) =>
+          localFile.setLastModified(remoteLastModified)
+          addSynced
+        case Failure(e) => logger.error("Download failed", e)
       }
-      localFile.setLastModified(remoteLastModified)
-      addSynced
-    } catch {
-      case e: GoogleJsonResponseException => logger.error("Download failed", e)
     }
   }
 
@@ -176,11 +177,11 @@ class SyncFile(val localFile: java.io.File, var driveFile: File, implicit val dr
           }
         }
       })*/
-      try {
-        driveFile = request.execute
-        addSynced
-      } catch {
-        case e: GoogleJsonResponseException => logger.error("Upload failed", e)
+      Try(request.execute) match {
+        case Success(response) =>
+          driveFile = response
+          addSynced
+        case Failure(e) => logger.error("Upload failed", e)
       }
     }    
   }
@@ -188,24 +189,22 @@ class SyncFile(val localFile: java.io.File, var driveFile: File, implicit val dr
   def update = {
     logger.info("Updating file " + path)
     for(input <- managed(new FileInputStream(localFile))) {
-    val request = drive.files.update(id, driveFile, mediaContent(input, localFile.length))
-    try {
-      driveFile = request.execute
-    } catch {
-      case e: GoogleJsonResponseException => logger.error("Update failed", e)
-    }
+      val request = drive.files.update(id, driveFile, mediaContent(input, localFile.length))
+      Try(request.execute) match {
+        case Success(response) => driveFile = response
+        case Failure(e) => logger.error("Update failed", e)
+      }
     }
   }
 
   def deleteRemote = {
     def delete = {
       val request = drive.files.delete(id)
-      try {
-        request.execute
-        driveFile.setId(null)
-        removeSynced
-      } catch {
-        case e: GoogleJsonResponseException => logger.error("Delete remote failed", e)
+      Try(request.execute) match {
+        case Success(_) =>
+          driveFile.setId(null)
+          removeSynced
+        case Failure(e) => logger.error("Delete remote failed", e)
       }
     }
     if (isRemoteFolder) {
