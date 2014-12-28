@@ -17,6 +17,7 @@ import com.google.api.services.drive.model.File
 import com.google.api.services.drive.model.ParentReference
 import com.typesafe.scalalogging.slf4j.LazyLogging
 import com.google.api.client.googleapis.json.GoogleJsonResponseException
+import resource._
 
 object SyncFile {
   def allChildren(children: ListBuffer[SyncFile]): ListBuffer[SyncFile] = {
@@ -149,7 +150,9 @@ class SyncFile(val localFile: java.io.File, var driveFile: File, implicit val dr
       }
     })*/
     try {
-      downloader.download(new GenericUrl(downloadUrl), new FileOutputStream(localFile))
+      for(output <- managed(new FileOutputStream(localFile))) {
+        downloader.download(new GenericUrl(downloadUrl), output)
+      }
       localFile.setLastModified(remoteLastModified)
       addSynced
     } catch {
@@ -157,34 +160,40 @@ class SyncFile(val localFile: java.io.File, var driveFile: File, implicit val dr
     }
   }
 
-  def mediaContent(length: Long) = new InputStreamContent(mimeType, new BufferedInputStream(new FileInputStream(localFile))).setLength(length)
+  def mediaContent(input: FileInputStream, length: Long) = {
+    new InputStreamContent(mimeType, new BufferedInputStream(input)).setLength(length)
+  }
 
   def upload = {
     logger.info("Uploading file " + path)
-    var request = drive.files.insert(driveFile, mediaContent(localFile.length))
-    request.getMediaHttpUploader.setDirectUploadEnabled(false)
-    /*request.getMediaHttpUploader.setProgressListener(new MediaHttpUploaderProgressListener() {
-      def progressChanged(uploader: MediaHttpUploader) {
-        if (uploader.getUploadState != UploadState.INITIATION_STARTED) {
-          logger.info("Uploaded " + math.round(uploader.getProgress * 100) + "%")
+    for(input <- managed(new FileInputStream(localFile))) {
+      var request = drive.files.insert(driveFile, mediaContent(input, localFile.length))
+      request.getMediaHttpUploader.setDirectUploadEnabled(false)
+      /*request.getMediaHttpUploader.setProgressListener(new MediaHttpUploaderProgressListener() {
+        def progressChanged(uploader: MediaHttpUploader) {
+          if (uploader.getUploadState != UploadState.INITIATION_STARTED) {
+            logger.info("Uploaded " + math.round(uploader.getProgress * 100) + "%")
+          }
         }
+      })*/
+      try {
+        driveFile = request.execute
+        addSynced
+      } catch {
+        case e: GoogleJsonResponseException => logger.error("Upload failed", e)
       }
-    })*/
-    try {
-      driveFile = request.execute
-      addSynced
-    } catch {
-      case e: GoogleJsonResponseException => logger.error("Upload failed", e)
-    }
+    }    
   }
 
   def update = {
     logger.info("Updating file " + path)
-    val request = drive.files.update(id, driveFile, mediaContent(localFile.length))
+    for(input <- managed(new FileInputStream(localFile))) {
+    val request = drive.files.update(id, driveFile, mediaContent(input, localFile.length))
     try {
       driveFile = request.execute
     } catch {
       case e: GoogleJsonResponseException => logger.error("Update failed", e)
+    }
     }
   }
 
